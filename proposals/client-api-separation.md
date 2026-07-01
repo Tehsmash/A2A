@@ -21,9 +21,9 @@ This conflation creates several problems:
   resolution step that belongs in the client library, not in application code.
 
 - **No path to network-layer operations.** Operations that are not server RPCs — fan-out to
-  multiple agents, pub/sub topics — have no normative place to land. Every attempt to add them
-  (see #1029, #1593, #1995) runs into the fact that the only available hook is the server service
-  definition, which is the wrong place.
+  multiple agents, joining shared channels, subscribing to event streams — have no normative place
+  to land. Every attempt to add them (see #1029, #1593, #1995) runs into the fact that the only
+  available hook is the server service definition, which is the wrong place.
 
 - **No tool schema derivable from the client API.** As AI agents increasingly use A2A operations
   as tools in their reasoning loops, a normative client API becomes the natural source for
@@ -300,8 +300,8 @@ Client API IDL
        │
        └── DefaultClient base (unsupported ops → UNIMPLEMENTED)
                ▲                  ▲
-       JsonRpcClient         MqttClient
-       (inherits defaults)   (overrides pub/sub operations)
+       JsonRpcClient         BrokeredClient
+       (inherits defaults)   (overrides channel/stream operations)
 ```
 
 ## Alternatives Considered
@@ -326,20 +326,24 @@ classes of operation have a well-defined home — they can be added to the clien
 touching `A2AService` or requiring every server implementation to change:
 
 **Multi-agent fan-out.** `SendMessage` already accepts multiple `AgentCard` targets in the design
-above. Transport bindings map this to parallel point-to-point calls, multicast, or a pub/sub
-publish according to their capabilities, with no changes to `A2AService`. (Relevant: #1029, #1593)
+above. Transport bindings map this to parallel point-to-point calls, multicast, or a broadcast
+according to their capabilities, with no changes to `A2AService`. (Relevant: #1029, #1593)
 
-**Pub/sub and topic operations.** Operations such as `ListTopics` and `SubscribeToTopic` are
-resolved by the broker, not by any individual agent server. They can be added to the client API
-and declared as supported by transport bindings that expose a brokered network, without any impact
-on the server spec.
+**Channels and event streams.** Some transport bindings expose the notion of shared communication
+channels or event streams that multiple agents can participate in — analogous to chat rooms or
+message channels. Operations such as `ListChannels`, `JoinChannel`, and `ListEventStreams` are
+resolved by the transport or broker layer, not by any individual agent server. They can be added
+to the client API and implemented by transport bindings that support this model, without any
+impact on the server spec. The exact naming and semantics of these operations is intentionally
+left open at this stage; the point is that the logical client API is the correct place to define
+them.
 
 ## Client Operations as Agent Tools
 
 A normative client API is the natural source for tool definitions surfaced to AI agents. An agent
-that needs to delegate work can be given `SendMessage`, `GetTask`, or pub/sub operations as
-structured tools derived directly from the client API definition, with consistent schemas across
-all SDK languages and frameworks.
+that needs to delegate work can be given `SendMessage`, `GetTask`, or channel and event stream
+operations as structured tools derived directly from the client API definition, with consistent
+schemas across all SDK languages and frameworks.
 
 This means the same pipeline that generates SDK scaffolding can also generate tool definitions for
 agent frameworks — MCP tool schemas, OpenAI function definitions, or equivalent — with no
